@@ -13,9 +13,21 @@
     <title>ChatCord App</title>
   </head>
   <body>
+      <section class="select">
+          <label for="audioSource">Audio source: </label>
+          <select id="audioSource"></select>
+        </section>
+    
+        <section class="select">
+          <label for="videoSource">Video source: </label>
+          <select id="videoSource"></select>
+        </section>
     <div class="chat-container">
       <header class="chat-header">
-        <h1><i class="fas fa-smile"></i> ChatCord</h1>
+          <h1><i class="fas fa-smile"></i> ChatCord</h1>
+        <div id="makeCall">
+          <a class="btn"><i class="fas fa-video"></i> Start a call</a>
+        </div>
         <a href="index.html" class="btn">Leave Room</a>
       </header>
       <main class="chat-main">
@@ -41,12 +53,14 @@
       </div>
     </div>
 
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/qs/6.9.2/qs.min.js"
-      integrity="sha256-TDxXjkAUay70ae/QJBEpGKkpVslXaHHayklIVglFRT4="
-      crossorigin="anonymous"
-    ></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js"></script>
+
+    
   </body>
+  <script
+  src="https://cdnjs.cloudflare.com/ajax/libs/qs/6.9.2/qs.min.js"
+  integrity="sha256-TDxXjkAUay70ae/QJBEpGKkpVslXaHHayklIVglFRT4="
+  crossorigin="anonymous"
+></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/main.js"></script>
 </html>

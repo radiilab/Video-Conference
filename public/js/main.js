@@ -2,6 +2,7 @@ const chatForm = document.getElementById('chat-form');
 const chatMessages = document.querySelector('.chat-messages');
 const roomName = document.getElementById('room-name');
 const userList = document.getElementById('users');
+//const videoSelect = document.getElementById("makeCall");
 //initialize per connection by stun sever maintained by google
 const peerConnections = {};
 const config = {
@@ -79,14 +80,53 @@ window.onunload = window.onbeforeunload = () => {
   socket.close();
 };
 
-// Get camera and microphone
-const videoElement = document.querySelector("video");
-const audioSelect = document.querySelector("select#audioSource");
-const videoSelect = document.querySelector("select#videoSource");
+socket.on("answer", (id, description) => {
+  peerConnections[id].setRemoteDescription(description);
+});
 
+socket.on("watcher", id => {
+  const peerConnection = new RTCPeerConnection(config);
+  peerConnections[id] = peerConnection;
+
+  let stream = videoElement.srcObject;
+  stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+
+  peerConnection.onicecandidate = event => {
+    if (event.candidate) {
+      socket.emit("candidate", id, event.candidate);
+    }
+  };
+
+  peerConnection
+    .createOffer()
+    .then(sdp => peerConnection.setLocalDescription(sdp))
+    .then(() => {
+      socket.emit("offer", id, peerConnection.localDescription);
+    });
+});
+
+socket.on("candidate", (id, candidate) => {
+  peerConnections[id].addIceCandidate(new RTCIceCandidate(candidate));
+});
+
+socket.on("disconnectPeer", id => {
+  peerConnections[id].close();
+  delete peerConnections[id];
+});
+
+
+// Get camera and microphone
+//const videoElement = document.querySelector("video");
+var audioSelect = document.getElementById("audioSource");
+var videoSelect = document.getElementById("videoSource");
+
+// audioSelect.onchange = getStream;
+// videoSelect.addEventListener("click",(e) =>{
+//   console.error(e);
+//   getStream();
+// });
 audioSelect.onchange = getStream;
 videoSelect.onchange = getStream;
-
 getStream()
   .then(getDevices)
   .then(gotDevices);
@@ -136,7 +176,8 @@ function gotStream(stream) {
   videoSelect.selectedIndex = [...videoSelect.options].findIndex(
     option => option.text === stream.getVideoTracks()[0].label
   );
-  videoElement.srcObject = stream;
+  videoSelect = stream.getVideoTracks().label
+  //videoElement.srcObject = stream;
   socket.emit("broadcaster");
 }
 
