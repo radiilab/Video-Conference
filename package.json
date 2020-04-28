@@ -1,20 +1,40 @@
 {
-  "name": "chatcord",
-  "version": "1.0.0",
-  "description": "Realtime chat app with rooms",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server",
-    "dev": "nodemon server"
-  },
-  "author": "Brad Traversy",
-  "license": "MIT",
+  "name": "webrtc",
+  "version": "0.1.0",
+  "private": true,
   "dependencies": {
-    "express": "^4.17.1",
-    "moment": "^2.24.0",
-    "socket.io": "^2.3.0"
+    "react": "^16.10.2",
+    "react-dom": "^16.10.2",
+    "react-scripts": "3.2.0",
+    "socket.io-client": "^2.3.0"
+  },
+  "scripts": {
+    "serve": "nodemon server.js --unhandled-rejections=strict",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
   "devDependencies": {
-    "nodemon": "^2.0.2"
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "ngrok": "^3.2.7",
+    "nodemon": "^2.0.3",
+    "socket.io": "^2.3.0"
   }
 }

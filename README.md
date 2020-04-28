@@ -1,13 +1,10 @@
-# ChatCord App
-Realtime chat app with websockets using Node.js, Express and Socket.io with Vanilla JS on the frontend with a custom UI
+Details in the following YouTube videos ...
 
-## Usage
-```
-npm install
-npm run dev
+Part 1
+https://youtu.be/h2WkZ0h0-Rc
 
-Go to localhost:3000
-```
+Part 2
+https://youtu.be/UMy6vV4tW00
 
-## Notes
-The *_html_css* folder is just a starter template to follow along with the tutorial at https://www.youtube.com/watch?v=jD7FnbI76Hg&t=1339s. It is not part of the app
+Part3
+https://youtu.be/znw78jlFxqA

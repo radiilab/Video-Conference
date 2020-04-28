@@ -1,75 +1,85 @@
-const path = require('path');
-const http = require('http');
-const express = require('express');
-const socketio = require('socket.io');
-const formatMessage = require('./utils/messages');
-const {
-  userJoin,
-  getCurrentUser,
-  userLeave,
-  getRoomUsers
-} = require('./utils/users');
 
-const app = express();
-const server = http.createServer(app);
-const io = socketio(server);
+const express = require('express')
+const ngrok = require('ngrok');
+const user = process.env.USER;
+const password = process.env.PASSWORD;
+require('dotenv').config();
 
-// Set static folder
-app.use(express.static(path.join(__dirname, 'public')));
+var io = require('socket.io')
+({
+  path: '/webrtc'
+})
 
-const botName = 'ChatCord Bot';
+const app = express()
+const port = process.env.PORT || 8080 ;
 
-// Run when client connects
-io.on('connection', socket => {
-  socket.on('joinRoom', ({ username, room }) => {
-    const user = userJoin(socket.id, username, room);
+// app.get('/', (req, res) => res.send('Hello World!!!!!'))
 
-    socket.join(user.room);
+//https://expressjs.com/en/guide/writing-middleware.html
+app.use(express.static(__dirname + '/build'))
+app.get('/', (req, res, next) => {
+    res.sendFile(__dirname + '/build/index.html')
+})
 
-    // Welcome current user
-    socket.emit('message', formatMessage(botName, 'Welcome to ChatCord!'));
-
-    // Broadcast when a user connects
-    socket.broadcast
-      .to(user.room)
-      .emit(
-        'message',
-        formatMessage(botName, `${user.username} has joined the chat`)
-      );
-
-    // Send users and room info
-    io.to(user.room).emit('roomUsers', {
-      room: user.room,
-      users: getRoomUsers(user.room)
-    });
-  });
-
-  // Listen for chatMessage
-  socket.on('chatMessage', msg => {
-    const user = getCurrentUser(socket.id);
-
-    io.to(user.room).emit('message', formatMessage(user.username, msg));
-  });
-
-  // Runs when client disconnects
-  socket.on('disconnect', () => {
-    const user = userLeave(socket.id);
-
-    if (user) {
-      io.to(user.room).emit(
-        'message',
-        formatMessage(botName, `${user.username} has left the chat`)
-      );
-
-      // Send users and room info
-      io.to(user.room).emit('roomUsers', {
-        room: user.room,
-        users: getRoomUsers(user.room)
-      });
-    }
-  });
+const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+ngrok.connect({
+  proto : 'http',
+  addr : process.env.PORT,
+  //auth : `${user}:${password}`
+}, (err, url) => {
+  if (err) {
+      console.error('Error while connecting Ngrok',err);
+      return new Error('Ngrok Failed');
+  } else {
+      console.log('Tunnel Created -> ', url);
+      console.log('Tunnel Inspector ->  http://127.0.0.1:4040');
+  }
+}).then(uri =>{
+  console.log(uri);
+}).catch(err=>{
+  console.error(err);
+  console.trace();
 });
+io.listen(server)
 
-const PORT = process.env.PORT || 3000;
+// https://www.tutorialspoint.com/socket.io/socket.io_namespaces.htm
+const peers = io.of('/webrtcPeer')
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// keep a reference of all socket connections
+let connectedPeers = new Map()
+
+peers.on('connection', socket => {
+
+  console.log(socket.id)
+  socket.emit('connection-success', { success: socket.id })
+
+  connectedPeers.set(socket.id, socket)
+
+  socket.on('disconnect', () => {
+    console.log('disconnected')
+    connectedPeers.delete(socket.id)
+  })
+
+  socket.on('offerOrAnswer', (data) => {
+    // send to the other peer(s) if any
+    for (const [socketID, socket] of connectedPeers.entries()) {
+      // don't send to self
+      if (socketID !== data.socketID) {
+        console.log(socketID, data.payload.type)
+        socket.emit('offerOrAnswer', data.payload)
+      }
+    }
+  })
+
+  socket.on('candidate', (data) => {
+    // send candidate to the other peer(s) if any
+    for (const [socketID, socket] of connectedPeers.entries()) {
+      // don't send to self
+      if (socketID !== data.socketID) {
+        console.log(socketID, data.payload)
+        socket.emit('candidate', data.payload)
+      }
+    }
+  })
+
+})
