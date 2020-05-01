@@ -79,3 +79,7 @@ yarn build to create the updated files in the build folder using react-scripts b
 
 In the App.js change up the version of the deployment to match the ngrok system
 this is basically utilizing test url to deploy for the time being
+
+**Note:
+there is only support for es 2015 standard sytle of coding
+do watchout for changes.
