@@ -25,6 +25,7 @@ class Video extends Component {
       <div
         style={{ ...this.props.frameStyle }}
       >
+        {/* <audio id={this.props.id} muted={this.props.muted} ref={ (ref) => {this.video = ref }}></audio> */}
         <video
           id={this.props.id}
           muted={this.props.muted}

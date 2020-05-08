@@ -36,7 +36,7 @@ class App extends Component {
     }
 
     // DONT FORGET TO CHANGE TO YOUR URL
-    this.serviceIP = 'https://7a65fd92.ngrok.io/webrtcPeer'
+    this.serviceIP = 'https://f22f97f7.ngrok.io/webrtcPeer'
 
     // https://reactjs.org/docs/refs-and-the-dom.html
     // this.localVideoref = React.createRef()
@@ -68,7 +68,7 @@ class App extends Component {
     // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
     // see the above link for more constraint options
     const constraints = {
-       audio: true,
+      // audio: true,
       video: true,
       // video: {
       //   width: 1280,
@@ -181,7 +181,9 @@ class App extends Component {
       this.serviceIP,
       {
         path: '/io/webrtc',
-        query: {}
+        query: {
+          room: window.location.pathname,
+        }
       }
     )
 
@@ -190,10 +192,17 @@ class App extends Component {
       this.getLocalStream()
 
       console.log(data.success)
-      const status = data.peerCount > 1 ? `Total Connected Peers: ${data.peerCount}` : 'Waiting for other peers to connect'
+      const status = data.peerCount > 1 ? `Total Connected Peers to room ${window.location.pathname}: ${data.peerCount}` : 'Waiting for other peers to connect'
 
       this.setState({
         status: status
+      })
+    })
+
+    this.socket.on('joined-peers', data => {
+
+      this.setState({
+        status: data.peerCount > 1 ? `Total Connected Peers to room ${window.location.pathname}: ${data.peerCount}` : 'Waiting for other peers to connect'
       })
     })
 
@@ -210,6 +219,7 @@ class App extends Component {
           // remoteStream: remoteStreams.length > 0 && remoteStreams[0].stream || null,
           remoteStreams,
           ...selectedVideo,
+          status: data.peerCount > 1 ? `Total Connected Peers to room ${window.location.pathname}: ${data.peerCount}` : 'Waiting for other peers to connect'
         }
         }
       )
