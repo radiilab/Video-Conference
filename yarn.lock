@@ -8671,17 +8671,10 @@ resolve-from@^4.0.0:
   resolved "https://registry.yarnpkg.com/resolve-from/-/resolve-from-4.0.0.tgz#4abcd852ad32dd7baabfe9b40e00a36db5f392e6"
   integrity sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g==
 
-<<<<<<< HEAD
-nodemon@^2.0.3:
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/nodemon/-/nodemon-2.0.3.tgz#e9c64df8740ceaef1cb00e1f3da57c0a93ef3714"
-  integrity sha512-lLQLPS90Lqwc99IHe0U94rDgvjo+G9I4uEIxRG3evSLROcqQ9hwc0AxlSHKS4T1JW/IMj/7N5mthiN58NL/5kw==
-=======
 resolve-url-loader@3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/resolve-url-loader/-/resolve-url-loader-3.1.0.tgz#54d8181d33cd1b66a59544d05cadf8e4aa7d37cc"
   integrity sha512-2QcrA+2QgVqsMJ1Hn5NnJXIGCX1clQ1F6QJTqOeiaDw9ACo1G2k+8/shq3mtqne03HOFyskAClqfxKyFBriXZg==
->>>>>>> develSecureWebApp
   dependencies:
     adjust-sourcemap-loader "2.0.0"
     camelcase "5.0.0"
