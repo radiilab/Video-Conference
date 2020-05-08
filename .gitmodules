@@ -1,3 +1,0 @@
-[submodule "stun-server"]
-	path = stun-server
-	url = https://github.com/radiilab/stun-server
