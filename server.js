@@ -1,10 +1,5 @@
 
 const express = require('express')
-const ngrok = require('ngrok');
-const user = process.env.USER;
-const password = process.env.PASSWORD;
-require('dotenv').config();
-//var cors = require('cors');
 
 var io = require('socket.io')
 ({
@@ -12,71 +7,23 @@ var io = require('socket.io')
 })
 
 const app = express()
-const port =process.env.PORT || 8080
+const port = 8080
 
+const rooms = {}
 
-// use it before all route definitions
-//app.use(cors({origin: `http://localhost:${port}`}));
 // app.get('/', (req, res) => res.send('Hello World!!!!!'))
 
-
-// Add headers
-app.use(function (req, res, next) {
-
-  // Website you wish to allow to connect
-  res.setHeader('Access-Control-Allow-Origin', `http://localhost:${port}`);
-
-  // Request methods you wish to allow
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-
-  // Request headers you wish to allow
-  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-
-  // Set to true if you need the website to include cookies in the requests sent
-  // to the API (e.g. in case you use sessions)
-  res.setHeader('Access-Control-Allow-Credentials', true);
-
-  // Pass to next layer of middleware
-  next();
-});
-
- const cors= function (req, res, next) {
-
-//   // Website you wish to allow to connect
-   res.setHeader('Access-Control-Allow-Origin', `http://localhost:${port}`);
-
-//   // Request methods you wish to allow
-   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-
-//   // Request headers you wish to allow
-   res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-
-//   // Set to true if you need the website to include cookies in the requests sent
-//   // to the API (e.g. in case you use sessions)
-   res.setHeader('Access-Control-Allow-Credentials', true);
-
-//   // Pass to next layer of middleware
-   next();
- }
 //https://expressjs.com/en/guide/writing-middleware.html
 app.use(express.static(__dirname + '/build'))
-app.get('/', cors, (req, res, next) => {
+app.get('/', (req, res, next) => { //default room
     res.sendFile(__dirname + '/build/index.html')
 })
-const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`))
 
-ngrok.connect({
-  proto : 'http',
-  addr : process.env.PORT,
-  //auth : `${user}:${password}`
-}).then(uri =>{
-  console.log('Tunnel Created -> ', uri);
-  console.log('Tunnel Inspector ->  http://127.0.0.1:4040');
-}).catch(err=>{
-  console.error('Error while connecting Ngrok', err);
-  console.trace();
-  return new Error('Ngrok Failed');
-});
+app.get('/:room', (req, res, next) => {
+  res.sendFile(__dirname + '/build/index.html')
+})
+
+const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`))
 
 io.listen(server)
 
@@ -89,36 +36,62 @@ io.on('connection', socket => {
 const peers = io.of('/webrtcPeer')
 
 // keep a reference of all socket connections
-let connectedPeers = new Map()
+// let connectedPeers = new Map()
 
 peers.on('connection', socket => {
 
-  connectedPeers.set(socket.id, socket)
+  const room = socket.handshake.query.room
+
+  rooms[room] = rooms[room] && rooms[room].set(socket.id, socket) || (new Map()).set(socket.id, socket)
+
+  // connectedPeers.set(socket.id, socket)
 
   console.log(socket.id)
   socket.emit('connection-success', {
     success: socket.id,
-    peerCount: connectedPeers.size,
+    peerCount: rooms[room].size,
   })
 
-  const broadcast = () => socket.broadcast.emit('joined-peers', {
-    peerCount: connectedPeers.size,
-  })
+  // const broadcast = () => socket.broadcast.emit('joined-peers', {
+  //   peerCount: connectedPeers.size,
+  // })
+  const broadcast = () => {
+    const _connectedPeers = rooms[room]
+
+    for (const [socketID, _socket] of _connectedPeers.entries()) {
+      // if (socketID !== socket.id) {
+        _socket.emit('joined-peers', {
+          peerCount: rooms[room].size, //connectedPeers.size,
+        })
+      // }
+    }
+  }
   broadcast()
 
-  const disconnectedPeer = (socketID) => socket.broadcast.emit('peer-disconnected', {
-    peerCount: connectedPeers.size,
-    socketID: socketID
-  })
+  // const disconnectedPeer = (socketID) => socket.broadcast.emit('peer-disconnected', {
+  //   peerCount: connectedPeers.size,
+  //   socketID: socketID
+  // })
+  const disconnectedPeer = (socketID) => {
+    const _connectedPeers = rooms[room]
+    for (const [_socketID, _socket] of _connectedPeers.entries()) {
+        _socket.emit('peer-disconnected', {
+          peerCount: rooms[room].size,
+          socketID
+        })
+    }
+  }
 
   socket.on('disconnect', () => {
     console.log('disconnected')
-    connectedPeers.delete(socket.id)
+    // connectedPeers.delete(socket.id)
+    rooms[room].delete(socket.id)
     disconnectedPeer(socket.id)
   })
 
   socket.on('onlinePeers', (data) => {
-    for (const [socketID, _socket] of connectedPeers.entries()) {
+    const _connectedPeers = rooms[room]
+    for (const [socketID, _socket] of _connectedPeers.entries()) {
       // don't send to self
       if (socketID !== data.socketID.local) {
         console.log('online-peer', data.socketID, socketID)
@@ -128,7 +101,8 @@ peers.on('connection', socket => {
   })
 
   socket.on('offer', data => {
-    for (const [socketID, socket] of connectedPeers.entries()) {
+    const _connectedPeers = rooms[room]
+    for (const [socketID, socket] of _connectedPeers.entries()) {
       // don't send to self
       if (socketID === data.socketID.remote) {
         // console.log('Offer', socketID, data.socketID, data.payload.type)
@@ -142,7 +116,8 @@ peers.on('connection', socket => {
   })
 
   socket.on('answer', (data) => {
-    for (const [socketID, socket] of connectedPeers.entries()) {
+    const _connectedPeers = rooms[room]
+    for (const [socketID, socket] of _connectedPeers.entries()) {
       if (socketID === data.socketID.remote) {
         console.log('Answer', socketID, data.socketID, data.payload.type)
         socket.emit('answer', {
@@ -166,8 +141,9 @@ peers.on('connection', socket => {
   // })
 
   socket.on('candidate', (data) => {
+    const _connectedPeers = rooms[room]
     // send candidate to the other peer(s) if any
-    for (const [socketID, socket] of connectedPeers.entries()) {
+    for (const [socketID, socket] of _connectedPeers.entries()) {
       if (socketID === data.socketID.remote) {
         socket.emit('candidate', {
           candidate: data.payload,

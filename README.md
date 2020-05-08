@@ -1,4 +1,8 @@
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Available Scripts
+
+In the project directory, you can run:
 
 ### `yarn start`
 
@@ -62,24 +66,3 @@ This section has moved here: https://facebook.github.io/create-react-app/docs/de
 ### `yarn build` fails to minify
 
 This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
-
-### what to do to deploy the system
-
-```shell
-yarn install : to install all the dependencies
-
-yarn serve : to start serving from the build folder as static files
-
-change the DOMAIN name in App.js
-yarn build to create the updated files in the build folder using react-scripts build tool
-
-```
-
-**Note: This has to be done else there shall be cors errors for the deployment
-
-In the App.js change up the version of the deployment to match the ngrok system
-this is basically utilizing test url to deploy for the time being
-
-**Note:
-there is only support for es 2015 standard sytle of coding
-do watchout for changes.
