@@ -1,166 +1,135 @@
+/**
+ * This file provided by Facebook is for non-commercial testing and evaluation
+ * purposes only. Facebook reserves all rights not expressly granted.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
-const express = require('express')
+var fs = require('fs');
+var path = require('path');
+var express = require('express');
+const http = require('http');
+const morgan = require('morgan');
+const socketio = require('socket.io');
+var bodyParser = require('body-parser');
+var reactViews = require('express-react-views');
+var errorHandler = require('errorhandler');
+//create the instances
+var app = express();
+const server = http.createServer(app);
+const io = socketio(server);
 
-var io = require('socket.io')
-({
-  path: '/io/webrtc'
-})
+var React = require('react');
+var ReactDOMServer = require('react-dom/server');
 
-const app = express()
-const port = 8080
+//different functionalities for maintaining different chat rooms
+const formatMessage = require('./utils/messages');
+const {
+  userJoin,
+  getCurrentUser,
+  userLeave,
+  getRoomUsers
+} = require('./utils/users');
 
-const rooms = {}
-const messages = {}
 
-// app.get('/', (req, res) => res.send('Hello World!!!!!'))
 
-//https://expressjs.com/en/guide/writing-middleware.html
-app.use(express.static(__dirname + '/build'))
-app.get('/', (req, res, next) => { //default room
-    res.sendFile(__dirname + '/build/index.html')
-})
+// the bot would inform about activites in room
+const botName = 'ChatCord Bot';
 
-app.get('/:room', (req, res, next) => {
-  res.sendFile(__dirname + '/build/index.html')
-})
+app.set('views', __dirname + '/views');
+app.set('view engine', 'jsx');
+var options = { 
+  transformViews:true,
+ };
+app.engine('jsx', reactViews.createEngine(options));
 
-const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+app.use('/', express.static(path.join(__dirname, 'public')));
 
-io.listen(server)
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// default namespace
+// development only
+if ('development' == app.get('env')) {
+  app.use(errorHandler());
+}
+
+// Additional middleware which will set headers that we need on each request.
+app.use(function (req, res, next) {
+  // Set permissive CORS header - this allows this server to be used only as
+  // an API server in conjunction with something like webpack-dev-server.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Disable caching so we'll always get the latest comments.
+  res.setHeader('Cache-Control', 'no-cache');
+  next();
+});
+//make a universal error middle ware with app.use()
+
+// middleware for logging in the dev mode only -- not for productions
+app.use(morgan('dev'));
+// importing routes
+const indexRoutes = require('./routes/index');
+
+// routes
+app.use('/', indexRoutes);
+
+// Run when client connects
 io.on('connection', socket => {
-  console.log('connected')
-})
+  socket.on('joinRoom', ({ username, room }) => {
+    const user = userJoin(socket.id, username, room);
 
-// https://www.tutorialspoint.com/socket.io/socket.io_namespaces.htm
-const peers = io.of('/webrtcPeer')
+    socket.join(user.room);
 
-// keep a reference of all socket connections
-// let connectedPeers = new Map()
+    // Welcome current user
+    socket.emit('message', formatMessage(botName, 'Welcome to ChatCord!'));
 
-peers.on('connection', socket => {
+    // Broadcast when a user connects
+    socket.broadcast
+      .to(user.room)
+      .emit(
+        'message',
+        formatMessage(botName, `${user.username} has joined the chat`)
+      );
 
-  const room = socket.handshake.query.room
+    // Send users and room info
+    io.to(user.room).emit('roomUsers', {
+      room: user.room,
+      users: getRoomUsers(user.room)
+    });
+  });
 
-  rooms[room] = rooms[room] && rooms[room].set(socket.id, socket) || (new Map()).set(socket.id, socket)
-  messages[room] = messages[room] || []
+  // Listen for chatMessage
+  socket.on('chatMessage', msg => {
+    const user = getCurrentUser(socket.id);
 
-  // connectedPeers.set(socket.id, socket)
+    io.to(user.room).emit('message', formatMessage(user.username, msg));
+  });
 
-  console.log(socket.id)
-  socket.emit('connection-success', {
-    success: socket.id,
-    peerCount: rooms[room].size,
-    messages: messages[room],
-  })
-
-  // const broadcast = () => socket.broadcast.emit('joined-peers', {
-  //   peerCount: connectedPeers.size,
-  // })
-  const broadcast = () => {
-    const _connectedPeers = rooms[room]
-
-    for (const [socketID, _socket] of _connectedPeers.entries()) {
-      // if (socketID !== socket.id) {
-        _socket.emit('joined-peers', {
-          peerCount: rooms[room].size, //connectedPeers.size,
-        })
-      // }
-    }
-  }
-  broadcast()
-
-  // const disconnectedPeer = (socketID) => socket.broadcast.emit('peer-disconnected', {
-  //   peerCount: connectedPeers.size,
-  //   socketID: socketID
-  // })
-  const disconnectedPeer = (socketID) => {
-    const _connectedPeers = rooms[room]
-    for (const [_socketID, _socket] of _connectedPeers.entries()) {
-        _socket.emit('peer-disconnected', {
-          peerCount: rooms[room].size,
-          socketID
-        })
-    }
-  }
-
-  socket.on('new-message', (data) => {
-    console.log('new-message', JSON.parse(data.payload))
-
-    messages[room] = [...messages[room], JSON.parse(data.payload)]
-  })
-
+  // Runs when client disconnects
   socket.on('disconnect', () => {
-    console.log('disconnected')
-    // connectedPeers.delete(socket.id)
-    rooms[room].delete(socket.id)
-    messages[room] = rooms[room].size === 0 ? null : messages[room]
-    disconnectedPeer(socket.id)
-  })
+    const user = userLeave(socket.id);
 
-  socket.on('onlinePeers', (data) => {
-    const _connectedPeers = rooms[room]
-    for (const [socketID, _socket] of _connectedPeers.entries()) {
-      // don't send to self
-      if (socketID !== data.socketID.local) {
-        console.log('online-peer', data.socketID, socketID)
-        socket.emit('online-peer', socketID)
-      }
+    if (user) {
+      io.to(user.room).emit(
+        'message',
+        formatMessage(botName, `${user.username} has left the chat`)
+      );
+
+      // Send users and room info
+      io.to(user.room).emit('roomUsers', {
+        room: user.room,
+        users: getRoomUsers(user.room)
+      });
     }
-  })
-
-  socket.on('offer', data => {
-    const _connectedPeers = rooms[room]
-    for (const [socketID, socket] of _connectedPeers.entries()) {
-      // don't send to self
-      if (socketID === data.socketID.remote) {
-        // console.log('Offer', socketID, data.socketID, data.payload.type)
-        socket.emit('offer', {
-            sdp: data.payload,
-            socketID: data.socketID.local
-          }
-        )
-      }
-    }
-  })
-
-  socket.on('answer', (data) => {
-    const _connectedPeers = rooms[room]
-    for (const [socketID, socket] of _connectedPeers.entries()) {
-      if (socketID === data.socketID.remote) {
-        console.log('Answer', socketID, data.socketID, data.payload.type)
-        socket.emit('answer', {
-            sdp: data.payload,
-            socketID: data.socketID.local
-          }
-        )
-      }
-    }
-  })
-
-  // socket.on('offerOrAnswer', (data) => {
-  //   // send to the other peer(s) if any
-  //   for (const [socketID, socket] of connectedPeers.entries()) {
-  //     // don't send to self
-  //     if (socketID !== data.socketID) {
-  //       console.log(socketID, data.payload.type)
-  //       socket.emit('offerOrAnswer', data.payload)
-  //     }
-  //   }
-  // })
-
-  socket.on('candidate', (data) => {
-    const _connectedPeers = rooms[room]
-    // send candidate to the other peer(s) if any
-    for (const [socketID, socket] of _connectedPeers.entries()) {
-      if (socketID === data.socketID.remote) {
-        socket.emit('candidate', {
-          candidate: data.payload,
-          socketID: data.socketID.local
-        })
-      }
-    }
-  })
-
-})
+  });
+});
+// get port from parameter listings or do start in default port
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, ()=> {
+  console.log('Server started: http://localhost:' + PORT + '/');
+});
