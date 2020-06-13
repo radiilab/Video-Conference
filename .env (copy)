@@ -1,0 +1,4 @@
+#  add this to the eenv before the project enters the 'yarn start' in developer mode`
+
+REMOTE_HOST=
+PORT=

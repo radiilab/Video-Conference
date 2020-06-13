@@ -36,7 +36,7 @@ class VideoApp extends Component {
     }
 
     // DONT FORGET TO CHANGE TO YOUR URL
-    this.serviceIP = 'https://7a65fd92.ngrok.io/webrtcPeer'
+    this.serviceIP =  props.host+'/webrtcPeer';// 'https://7a65fd92.ngrok.io/webrtcPeer'
 
     // https://reactjs.org/docs/refs-and-the-dom.html
     // this.localVideoref = React.createRef()

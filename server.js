@@ -19,6 +19,7 @@ const socketio = require('socket.io');
 var bodyParser = require('body-parser');
 var reactViews = require('express-react-views');
 var errorHandler = require('errorhandler');
+require('dotenv').config()
 //create the instances
 var app = express();
 const server = http.createServer(app);
@@ -79,55 +80,193 @@ const indexRoutes = require('./routes/index');
 app.use('/', indexRoutes);
 
 // Run when client connects
+// io.on('connection', socket => {
+//   socket.on('joinRoom', ({ username, room }) => {
+//     const user = userJoin(socket.id, username, room);
+
+//     socket.join(user.room);
+
+//     // Welcome current user
+//     socket.emit('message', formatMessage(botName, 'Welcome to ChatCord!'));
+
+//     // Broadcast when a user connects
+//     socket.broadcast
+//       .to(user.room)
+//       .emit(
+//         'message',
+//         formatMessage(botName, `${user.username} has joined the chat`)
+//       );
+
+//     // Send users and room info
+//     io.to(user.room).emit('roomUsers', {
+//       room: user.room,
+//       users: getRoomUsers(user.room)
+//     });
+//   });
+
+//   // Listen for chatMessage
+//   socket.on('chatMessage', msg => {
+//     const user = getCurrentUser(socket.id);
+
+//     io.to(user.room).emit('message', formatMessage(user.username, msg));
+//   });
+
+//   // Runs when client disconnects
+//   socket.on('disconnect', () => {
+//     const user = userLeave(socket.id);
+
+//     if (user) {
+//       io.to(user.room).emit(
+//         'message',
+//         formatMessage(botName, `${user.username} has left the chat`)
+//       );
+
+//       // Send users and room info
+//       io.to(user.room).emit('roomUsers', {
+//         room: user.room,
+//         users: getRoomUsers(user.room)
+//       });
+//     }
+//   });
+// });
+
+// default namespace
 io.on('connection', socket => {
-  socket.on('joinRoom', ({ username, room }) => {
-    const user = userJoin(socket.id, username, room);
+  console.log('connected')
+})
 
-    socket.join(user.room);
+// https://www.tutorialspoint.com/socket.io/socket.io_namespaces.htm
+const peers = io.of('/webrtcPeer')
 
-    // Welcome current user
-    socket.emit('message', formatMessage(botName, 'Welcome to ChatCord!'));
+// keep a reference of all socket connections
+// let connectedPeers = new Map()
 
-    // Broadcast when a user connects
-    socket.broadcast
-      .to(user.room)
-      .emit(
-        'message',
-        formatMessage(botName, `${user.username} has joined the chat`)
-      );
 
-    // Send users and room info
-    io.to(user.room).emit('roomUsers', {
-      room: user.room,
-      users: getRoomUsers(user.room)
-    });
-  });
+peers.on('connection', socket => {
 
-  // Listen for chatMessage
-  socket.on('chatMessage', msg => {
-    const user = getCurrentUser(socket.id);
+  const room = socket.handshake.query.room
 
-    io.to(user.room).emit('message', formatMessage(user.username, msg));
-  });
+  rooms[room] = rooms[room] && rooms[room].set(socket.id, socket) || (new Map()).set(socket.id, socket)
+  messages[room] = messages[room] || []
 
-  // Runs when client disconnects
-  socket.on('disconnect', () => {
-    const user = userLeave(socket.id);
+  // connectedPeers.set(socket.id, socket)
 
-    if (user) {
-      io.to(user.room).emit(
-        'message',
-        formatMessage(botName, `${user.username} has left the chat`)
-      );
+  console.log(socket.id)
+  socket.emit('connection-success', {
+    success: socket.id,
+    peerCount: rooms[room].size,
+    messages: messages[room],
+  })
 
-      // Send users and room info
-      io.to(user.room).emit('roomUsers', {
-        room: user.room,
-        users: getRoomUsers(user.room)
-      });
+  // const broadcast = () => socket.broadcast.emit('joined-peers', {
+  //   peerCount: connectedPeers.size,
+  // })
+  const broadcast = () => {
+    const _connectedPeers = rooms[room]
+
+    for (const [socketID, _socket] of _connectedPeers.entries()) {
+      // if (socketID !== socket.id) {
+        _socket.emit('joined-peers', {
+          peerCount: rooms[room].size, //connectedPeers.size,
+        })
+      // }
     }
-  });
-});
+  }
+  broadcast()
+
+  // const disconnectedPeer = (socketID) => socket.broadcast.emit('peer-disconnected', {
+  //   peerCount: connectedPeers.size,
+  //   socketID: socketID
+  // })
+  const disconnectedPeer = (socketID) => {
+    const _connectedPeers = rooms[room]
+    for (const [_socketID, _socket] of _connectedPeers.entries()) {
+        _socket.emit('peer-disconnected', {
+          peerCount: rooms[room].size,
+          socketID
+        })
+    }
+  }
+
+  socket.on('new-message', (data) => {
+    console.log('new-message', JSON.parse(data.payload))
+
+    messages[room] = [...messages[room], JSON.parse(data.payload)]
+  })
+
+  socket.on('disconnect', () => {
+    console.log('disconnected')
+    // connectedPeers.delete(socket.id)
+    rooms[room].delete(socket.id)
+    messages[room] = rooms[room].size === 0 ? null : messages[room]
+    disconnectedPeer(socket.id)
+  })
+
+  socket.on('onlinePeers', (data) => {
+    const _connectedPeers = rooms[room]
+    for (const [socketID, _socket] of _connectedPeers.entries()) {
+      // don't send to self
+      if (socketID !== data.socketID.local) {
+        console.log('online-peer', data.socketID, socketID)
+        socket.emit('online-peer', socketID)
+      }
+    }
+  })
+
+  socket.on('offer', data => {
+    const _connectedPeers = rooms[room]
+    for (const [socketID, socket] of _connectedPeers.entries()) {
+      // don't send to self
+      if (socketID === data.socketID.remote) {
+        // console.log('Offer', socketID, data.socketID, data.payload.type)
+        socket.emit('offer', {
+            sdp: data.payload,
+            socketID: data.socketID.local
+          }
+        )
+      }
+    }
+  })
+
+  socket.on('answer', (data) => {
+    const _connectedPeers = rooms[room]
+    for (const [socketID, socket] of _connectedPeers.entries()) {
+      if (socketID === data.socketID.remote) {
+        console.log('Answer', socketID, data.socketID, data.payload.type)
+        socket.emit('answer', {
+            sdp: data.payload,
+            socketID: data.socketID.local
+          }
+        )
+      }
+    }
+  })
+
+  // socket.on('offerOrAnswer', (data) => {
+  //   // send to the other peer(s) if any
+  //   for (const [socketID, socket] of connectedPeers.entries()) {
+  //     // don't send to self
+  //     if (socketID !== data.socketID) {
+  //       console.log(socketID, data.payload.type)
+  //       socket.emit('offerOrAnswer', data.payload)
+  //     }
+  //   }
+  // })
+
+  socket.on('candidate', (data) => {
+    const _connectedPeers = rooms[room]
+    // send candidate to the other peer(s) if any
+    for (const [socketID, socket] of _connectedPeers.entries()) {
+      if (socketID === data.socketID.remote) {
+        socket.emit('candidate', {
+          candidate: data.payload,
+          socketID: data.socketID.local
+        })
+      }
+    }
+  })
+
+})
 // get port from parameter listings or do start in default port
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=> {

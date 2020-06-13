@@ -9,7 +9,7 @@ import VideoApp from './conf'
 function VideoLoader(props) {
   return (
     <Layout title={props.title}>
-        <VideoApp/>
+        <VideoApp host={props.host}/>
     </Layout>
   );
 }

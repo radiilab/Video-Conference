@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+require('dotenv').config()
     // var COMMENTS_FILE = path.join(__dirname, 'comments.json');
     // //make the routing 
 
@@ -89,12 +90,15 @@ const router = express.Router();
 
     //     });
     // });
+
 router.get('/', (req, res) => {
     res.render('index', {title: 'First Page', foo: {bar: 'baz'}})
 });
 
 router.get('/app', (req, res) => {
-    res.render('video/loader', {title: 'Video app', foo: {bar: 'baz'}})
+// get the server app host port for the system to responds
+    console.log(process.env.REMOTE_HOST)
+    res.render('video/loader', {title: 'Video app', host: process.env.REMOTE_HOST})
 });
 
 
